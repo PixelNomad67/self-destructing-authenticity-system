@@ -1,0 +1,8 @@
+{
+    "metadata": {
+        "file": "content/sample.txt",
+        "hash": "b6db29aee693655fd65d3e0c0431feb3ff97ef5f22122adaa0301d2287338888",
+        "expiry": "2026-02-15T13:40:16.830211"
+    },
+    "signature": "3046022100f6c6808e84dd77f249bc91efb07756a2a22160434480fa930cb786ae187a260802210087fff69ed10bc8036b76d9a196d2efb8c631ac27de4ca0aa6ba6d0d8f9900806"
+}
