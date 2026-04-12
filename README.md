@@ -8,88 +8,97 @@ pinned: false
 app_port: 7860
 ---
 
-# Time-Bound Digital Authenticity System
+# 🛡️ EpochSeal: Time-Bound Digital Authenticity System
 
-## Overview
+[![Live Demo](https://img.shields.io/badge/Live_Demo-Hugging_Face-indigo?style=for-the-badge&logo=huggingface)](https://p-yuxh-self-destructing-authenticity-system.hf.space)
 
-This project implements a time-scoped digital authenticity framework using cryptographic signatures and expiry enforcement.
+**EpochSeal** is a groundbreaking framework that introduces expiration dates to digital authenticity. Unlike traditional digital signatures that remain valid indefinitely (potentially leading to replay attacks or out-of-context misuse), this system ensures that signed content is only considered authentic within a predefined, strict time window. Once the time is up, the content safely "self-destructs" its trusted status.
 
-Unlike traditional digital signatures that remain valid indefinitely, this system enforces a predefined authenticity window. After expiration, content is intentionally treated as untrusted.
+---
 
-## Motivation
+## ✨ Features
 
-Permanent authenticity can introduce risks such as replay attacks and misuse of outdated content. This system demonstrates lifecycle-based trust enforcement using:
+- **⏳ Time-Bound Authenticity**: Cryptographically enforce an expiration timestamp on files.
+- **🔒 Secure ECDSA Signatures**: Bulletproof authenticity validation using Elliptic Curve Digital Signature Algorithm.
+- **🛡️ Tamper Detection**: Instant integrity validation using SHA-256 hashing.
+- **🗃️ Persistent Registry**: SQLite-backed record management for historical tracking of signed credentials.
+- **🌐 Web Interface**: Clean, dark-mode, glassmorphic UI built with Flask to easily sign and verify files. 
 
-- SHA-256 hashing
-- ECDSA digital signatures
-- Expiry-based policy validation
+---
 
-## Features
+## 🚀 Live Demo
 
-- Content hashing (SHA-256)
-- Digital signature using ECDSA
-- Time-bound authenticity window
-- Tamper detection
-- Expiry enforcement
+You can try the fully functioning web application directly in your browser:
+👉 **[Launch EpochSeal on Hugging Face](https://p-yuxh-self-destructing-authenticity-system.hf.space)** (Direct Full-Screen Link)
+<br>
+👉 **[Hugging Face Space Repository](https://huggingface.co/spaces/p-yuxh/self-destructing-authenticity-system)** 
 
-## Project Structure
+---
 
-generate_keys.py → Generates ECDSA key pair
-signer.py → Signs content with expiry metadata
-verifier.py → Verifies integrity, signature, and expiry
+## 🛠️ How It Works
 
-## How It Works
+1. **Upload & Hash**: An uploaded file is hashed using **SHA-256**.
+2. **Metadata Generation**: The hash, along with a specified **expiry timestamp**, is packaged into a metadata object.
+3. **Cryptographic Signing**: The metadata is digested and signed using the server's private ECDSA key.
+4. **Verification Flow**: 
+   - When verified, the system recalculates the hash and parses the original signature.
+   - It checks the validity of the signature, ensures the file has not been tampered with, and validates if the current time is earlier than the expiry time.
+   - **Outputs** resulting status: `VALID` (100 Trust Score), `TAMPERED` (0 Trust Score), or `EXPIRED` (0 Trust Score).
 
-1. Content is hashed.
-2. Metadata includes hash and expiry timestamp.
-3. Metadata is digitally signed.
-4. Verification checks:
-   - Integrity
-   - Signature validity
-   - Expiry status
+---
 
-Possible Outputs:
-- VALID
-- TAMPERED
-- EXPIRED
+## 💻 Local Installation
 
-## Installation
+To run EpochSeal on your own machine:
 
-Install dependencies:
+### 1. Clone & Set Up
+```bash
+# Clone your repository (update with your actual git repo)
+git clone ...
+cd self-destructing-authenticity-system
 
+# Install dependencies
 pip install -r requirements.txt
+```
 
-Generate keys:
-
+### 2. Generate Cryptographic Keys
+Before the first run, ensure cryptographic keys are populated:
+```bash
 python generate_keys.py
+```
 
-Sign content:
+### 3. Run the Web Server
+Launch the Flask dashboard locally:
+```bash
+python app.py
+```
+Then, open your browser and navigate to `http://127.0.0.1:5000`.
 
-python signer.py content/sample.txt
+*(Note: Command-line testing is also available via `signer.py` and `verifier.py`)*
 
-Verify content:
+---
 
-python verifier.py
+## 🛡️ Threat Model
 
-## Threat Model
-
-This system protects against:
+**Mitigates:**
 - Post-expiry replay of signed content
-- Content tampering
-- Unauthorized modification
+- Content tampering and unauthorized modification
 
-It does not protect against:
-- Full system compromise before expiry
-- Advanced archival adversaries
+**Out of Scope:**
+- Full system compromise prior to file expiry
+- Extremely advanced archival adversaries storing states before expiry
 
-## Future Work
+---
 
-- Automated key destruction
-- Distributed key decay simulation
-- Web-based verification interface
+## 🔮 Future Work
 
-## Author
+- [ ] Automated cryptographic key destruction
+- [ ] Distributed key decay simulation
+- [ ] Decentralized verification networks
 
-Piyush Roy 
-Registration No.: 2427030318 
-Section: C
+---
+
+## 👨‍💻 Author
+**Piyush Roy**  
+Registration No.: `2427030318`  
+Section: `C`
