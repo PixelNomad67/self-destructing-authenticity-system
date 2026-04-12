@@ -1,5 +1,5 @@
 ---
-title: Epoch Seal
+title: Time-Bound Digital Authenticity System
 emoji: 🛡️
 colorFrom: indigo
 colorTo: blue
@@ -8,11 +8,11 @@ pinned: false
 app_port: 7860
 ---
 
-# 🛡️ EpochSeal: Time-Bound Digital Authenticity System
+# 🛡️ Time-Bound Digital Authenticity System
 
 [![Live Demo](https://img.shields.io/badge/Live_Demo-Hugging_Face-indigo?style=for-the-badge&logo=huggingface)](https://p-yuxh-self-destructing-authenticity-system.hf.space)
 
-**EpochSeal** is a groundbreaking framework that introduces expiration dates to digital authenticity. Unlike traditional digital signatures that remain valid indefinitely (potentially leading to replay attacks or out-of-context misuse), this system ensures that signed content is only considered authentic within a predefined, strict time window. Once the time is up, the content safely "self-destructs" its trusted status.
+**Time-Bound Digital Authenticity System** is a groundbreaking framework that introduces expiration dates to digital authenticity. Unlike traditional digital signatures that remain valid indefinitely (potentially leading to replay attacks or out-of-context misuse), this system ensures that signed content is only considered authentic within a predefined, strict time window. Once the time is up, the content safely "self-destructs" its trusted status.
 
 ---
 
@@ -29,7 +29,7 @@ app_port: 7860
 ## 🚀 Live Demo
 
 You can try the fully functioning web application directly in your browser:
-👉 **[Launch EpochSeal on Hugging Face](https://p-yuxh-self-destructing-authenticity-system.hf.space)** (Direct Full-Screen Link)
+👉 **[Launch the System on Hugging Face](https://p-yuxh-self-destructing-authenticity-system.hf.space)** (Direct Full-Screen Link)
 <br>
 👉 **[Hugging Face Space Repository](https://huggingface.co/spaces/p-yuxh/self-destructing-authenticity-system)** 
 
@@ -49,7 +49,7 @@ You can try the fully functioning web application directly in your browser:
 
 ## 💻 Local Installation
 
-To run EpochSeal on your own machine:
+To run the system on your own machine:
 
 ### 1. Clone & Set Up
 ```bash
