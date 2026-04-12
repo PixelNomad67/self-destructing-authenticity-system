@@ -1,0 +1,1299 @@
+Project Source Code Dump
+=======================
+
+--- File: ./README.md ---
+# Time-Bound Digital Authenticity System
+
+## Overview
+
+This project implements a time-scoped digital authenticity framework using cryptographic signatures and expiry enforcement.
+
+Unlike traditional digital signatures that remain valid indefinitely, this system enforces a predefined authenticity window. After expiration, content is intentionally treated as untrusted.
+
+## Motivation
+
+Permanent authenticity can introduce risks such as replay attacks and misuse of outdated content. This system demonstrates lifecycle-based trust enforcement using:
+
+- SHA-256 hashing
+- ECDSA digital signatures
+- Expiry-based policy validation
+
+## Features
+
+- Content hashing (SHA-256)
+- Digital signature using ECDSA
+- Time-bound authenticity window
+- Tamper detection
+- Expiry enforcement
+
+## Project Structure
+
+generate_keys.py → Generates ECDSA key pair
+signer.py → Signs content with expiry metadata
+verifier.py → Verifies integrity, signature, and expiry
+
+## How It Works
+
+1. Content is hashed.
+2. Metadata includes hash and expiry timestamp.
+3. Metadata is digitally signed.
+4. Verification checks:
+   - Integrity
+   - Signature validity
+   - Expiry status
+
+Possible Outputs:
+- VALID
+- TAMPERED
+- EXPIRED
+
+## Installation
+
+Install dependencies:
+
+pip install -r requirements.txt
+
+Generate keys:
+
+python generate_keys.py
+
+Sign content:
+
+python signer.py content/sample.txt
+
+Verify content:
+
+python verifier.py
+
+## Threat Model
+
+This system protects against:
+- Post-expiry replay of signed content
+- Content tampering
+- Unauthorized modification
+
+It does not protect against:
+- Full system compromise before expiry
+- Advanced archival adversaries
+
+## Future Work
+
+- Automated key destruction
+- Distributed key decay simulation
+- Web-based verification interface
+
+## Author
+
+Piyush Roy 
+Registration No.: 2427030318 
+Section: C
+
+
+--- File: ./generate_keys.py ---
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.hazmat.primitives import serialization
+
+
+private_key = ec.generate_private_key(ec.SECP256R1())
+
+
+with open("keys/private_key.pem", "wb") as f:
+    f.write(
+        private_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption()
+        )
+    )
+
+
+public_key = private_key.public_key()
+
+with open("keys/public_key.pem", "wb") as f:
+    f.write(
+        public_key.public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo
+        )
+    )
+
+print("Keys generated successfully.")
+
+
+
+--- File: ./signer.py ---
+import hashlib
+import json
+import datetime
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.exceptions import InvalidSignature
+
+
+# Load private key
+with open("keys/private_key.pem", "rb") as f:
+    private_key = serialization.load_pem_private_key(f.read(), password=None)
+
+
+def sign_content(file_path, expiry_seconds=60):
+    # Read file
+    with open(file_path, "rb") as f:
+        content = f.read()
+
+    # Hash content
+    content_hash = hashlib.sha256(content).hexdigest()
+
+    # Set expiry
+    expiry_time = datetime.datetime.utcnow() + datetime.timedelta(seconds=expiry_seconds)
+    expiry_str = expiry_time.isoformat()
+
+    # Metadata
+    metadata = {
+        "file": file_path,
+        "hash": content_hash,
+        "expiry": expiry_str
+    }
+
+    metadata_bytes = json.dumps(metadata).encode()
+
+    # Sign metadata
+    signature = private_key.sign(
+        metadata_bytes,
+        ec.ECDSA(hashes.SHA256())
+    )
+
+    # Save metadata + signature
+    output = {
+        "metadata": metadata,
+        "signature": signature.hex()
+    }
+
+    with open("metadata/signature.json", "w") as f:
+        json.dump(output, f, indent=4)
+
+    print("Content signed successfully.")
+    print("Expires at:", expiry_str)
+
+
+if __name__ == "__main__":
+    sign_content("content/sample.txt", expiry_seconds=60)
+
+
+
+--- File: ./verifier.py ---
+import hashlib
+import json
+import datetime
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.exceptions import InvalidSignature
+
+
+# Load public key
+with open("keys/public_key.pem", "rb") as f:
+    public_key = serialization.load_pem_public_key(f.read())
+
+
+def verify_content():
+    # Load signature file
+    with open("metadata/signature.json", "r") as f:
+        data = json.load(f)
+
+    metadata = data["metadata"]
+    signature = bytes.fromhex(data["signature"])
+
+    file_path = metadata["file"]
+
+    # Check expiry
+    expiry_time = datetime.datetime.fromisoformat(metadata["expiry"])
+    if datetime.datetime.utcnow() > expiry_time:
+        print("STATUS: EXPIRED")
+        return
+
+    # Read file
+    with open(file_path, "rb") as f:
+        content = f.read()
+
+    # Recalculate hash
+    current_hash = hashlib.sha256(content).hexdigest()
+
+    if current_hash != metadata["hash"]:
+        print("STATUS: TAMPERED")
+        return
+
+    # Verify signature
+    try:
+        public_key.verify(
+            signature,
+            json.dumps(metadata).encode(),
+            ec.ECDSA(hashes.SHA256())
+        )
+        print("STATUS: VALID")
+    except InvalidSignature:
+        print("STATUS: INVALID SIGNATURE")
+
+
+if __name__ == "__main__":
+    verify_content()
+
+
+
+--- File: ./requirements.txt ---
+flask
+cryptography
+
+
+--- File: ./app.py ---
+from flask import Flask, request, render_template
+import os
+from core.crypto import sign_content, verify_content
+from core.trust_engine import calculate_trust
+from database.db import init_db, insert_file, get_all_files, get_file_by_name, get_file_by_id
+
+app = Flask(__name__)
+UPLOAD_FOLDER = "uploads"
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+# Initialize Database on startup
+init_db()
+
+@app.route("/")
+def home():
+    return render_template("index.html")
+
+@app.route("/sign", methods=["POST"])
+def sign():
+    file = request.files["file"]
+    expiry = int(request.form["expiry"])
+
+    path = os.path.join(UPLOAD_FOLDER, file.filename)
+    file.save(path)
+
+    # Output gives us metadata and signature
+    output = sign_content(path, expiry)
+    metadata = output["metadata"]
+    
+    # Store persistent record in the database
+    insert_file(
+        filename=file.filename,
+        file_hash=metadata["hash"],
+        expiry=metadata["expiry"],
+        signature_hex=output["signature"]
+    )
+
+    return render_template("dashboard.html",
+                           status="SIGNED",
+                           score="100",
+                           expiry=metadata["expiry"])
+
+
+@app.route("/verify", methods=["POST"])
+def verify():
+    file = request.files["file"]
+
+    path = os.path.join(UPLOAD_FOLDER, file.filename)
+    file.save(path)
+
+    record = get_file_by_name(file.filename)
+    if not record:
+        return "Signature record not found in Database for file: " + file.filename, 404
+
+    metadata = {
+        "file": path,
+        "hash": record["file_hash"],
+        "expiry": record["expiry"]
+    }
+
+    result = verify_content(path, metadata, record["signature_hex"])
+    score, status = calculate_trust(result)
+
+    return render_template("dashboard.html",
+                           status=status,
+                           score=score,
+                           expiry=result["expiry"])
+
+@app.route("/registry")
+def files():
+    all_files = get_all_files()
+    return render_template("files.html", files=all_files)
+
+@app.route("/verify_record/<int:file_id>")
+def verify_record(file_id):
+    record = get_file_by_id(file_id)
+    if not record:
+        return "Signature record not found", 404
+        
+    path = os.path.join(UPLOAD_FOLDER, record["filename"])
+    if not os.path.exists(path):
+        return "Original file is missing from the server.", 404
+
+    metadata = {
+        "file": path,
+        "hash": record["file_hash"],
+        "expiry": record["expiry"]
+    }
+
+    result = verify_content(path, metadata, record["signature_hex"])
+    score, status = calculate_trust(result)
+
+    return render_template("dashboard.html",
+                           status=status,
+                           score=score,
+                           expiry=result["expiry"])
+
+if __name__ == "__main__":
+    app.run(debug=True)
+
+
+--- File: ./sample.txt ---
+Secret content for trust
+
+
+--- File: ./content/sample2.txt ---
+Tampered sample
+
+
+--- File: ./content/sample.txt ---
+This is a Sample Content
+Tampered
+
+
+--- File: ./metadata/signature.json ---
+{
+    "metadata": {
+        "file": "uploads/sample.txt",
+        "hash": "4ca8db836effb6eb62915e1d27d2a33a38d88e26faa1e13887415c24bb3bc7b0",
+        "expiry": "2026-04-10T05:21:52.973695"
+    },
+    "signature": "304402200d03890f04ef207486c34346e76df21b3657e8fe2296ab427c00051ee355f444022022841f4be172a7bf94bcd961b893edca7ba837fbf1ac7f295afe5d5000466fed"
+}
+
+
+--- File: ./crypto/signing.py ---
+import hashlib
+import json
+import datetime
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import ec
+
+def sign_content(file_path, expiry_seconds):
+    with open(file_path, "rb") as f:
+        content = f.read()
+
+    content_hash = hashlib.sha256(content).hexdigest()
+
+    expiry_time = (datetime.datetime.utcnow() +
+                   datetime.timedelta(seconds=expiry_seconds)).isoformat()
+
+    metadata = {
+        "file": file_path,
+        "hash": content_hash,
+        "expiry": expiry_time
+    }
+
+    with open("keys/private_key.pem", "rb") as f:
+        private_key = serialization.load_pem_private_key(f.read(), password=None)
+
+    signature = private_key.sign(
+        json.dumps(metadata).encode(),
+        ec.ECDSA(hashes.SHA256())
+    )
+
+    output = {
+        "metadata": metadata,
+        "signature": signature.hex()
+    }
+
+    with open("metadata/signature.json", "w") as f:
+        json.dump(output, f, indent=4)
+
+    return expiry_time
+
+
+--- File: ./crypto/hashing.py ---
+import hashlib
+import json
+import datetime
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.exceptions import InvalidSignature
+
+def verify_content(file_path):
+    with open("metadata/signature.json", "r") as f:
+        data = json.load(f)
+
+    metadata = data["metadata"]
+    signature = bytes.fromhex(data["signature"])
+
+    with open("keys/public_key.pem", "rb") as f:
+        public_key = serialization.load_pem_public_key(f.read())
+
+    # Expiry check
+    expiry_time = datetime.datetime.fromisoformat(metadata["expiry"])
+    if datetime.datetime.utcnow() > expiry_time:
+        return "EXPIRED"
+
+    # Hash check
+    with open(file_path, "rb") as f:
+        content = f.read()
+
+    current_hash = hashlib.sha256(content).hexdigest()
+
+    if current_hash != metadata["hash"]:
+        return "TAMPERED"
+
+    # Signature check
+    try:
+        public_key.verify(
+            signature,
+            json.dumps(metadata).encode(),
+            ec.ECDSA(hashes.SHA256())
+        )
+        return "VALID"
+    except InvalidSignature:
+        return "INVALID SIGNATURE"
+
+
+--- File: ./templates/index.html ---
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EpochSeal | Authenticity Engine</title>
+    <!-- Use FontAwesome for simple icons, or just SVGs. We'll use CDN for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+
+    <div class="logo-container">
+        <i class="fa-solid fa-fingerprint logo-icon"></i>
+        <h1 class="title">Epoch<span class="logo-accent">Seal</span></h1>
+    </div>
+    <p class="subtitle">Time-Bound Digital Authenticity System</p>
+
+    <!-- Navigation -->
+    <div style="margin-bottom: 2rem;">
+        <a href="/registry" class="btn btn-secondary" style="display: inline-flex; width: auto; padding: 0.75rem 1.5rem;">
+            <i class="fa-solid fa-database"></i> View Signature Database
+        </a>
+    </div>
+
+    <div class="container">
+        <!-- Sign Panel -->
+        <div class="clean-panel">
+            <h2 class="panel-title"><i class="fa-solid fa-file-signature"></i> Sign Content</h2>
+            <form action="/sign" method="post" enctype="multipart/form-data">
+                
+                <div class="drop-zone">
+                    <i class="fa-solid fa-cloud-arrow-up drop-zone-icon"></i>
+                    <p class="drop-zone-text">Drag & drop a file to sign, or <strong>browse</strong></p>
+                    <input type="file" name="file" class="file-input" required>
+                </div>
+                
+                <div class="selected-file">
+                    <i class="fa-solid fa-file-lines" style="color: var(--primary-cyan)"></i>
+                    <span class="file-name">No file selected</span>
+                </div>
+
+                <div class="form-group" style="margin-top: 1.5rem;">
+                    <label class="form-label" for="expiry">Expiry Time (Seconds)</label>
+                    <input type="number" id="expiry" name="expiry" class="form-input" placeholder="e.g., 3600" required min="1">
+                </div>
+
+                <button type="submit" class="btn btn-primary">
+                    <i class="fa-solid fa-lock"></i> Generate Signature
+                </button>
+            </form>
+        </div>
+
+        <!-- Verify Panel -->
+        <div class="clean-panel">
+            <h2 class="panel-title"><i class="fa-solid fa-shield-halved"></i> Verify Authenticity</h2>
+            <form action="/verify" method="post" enctype="multipart/form-data">
+                
+                <div class="drop-zone" style="height: calc(100% - 94px); min-height: 200px;">
+                    <i class="fa-solid fa-file-circle-check drop-zone-icon"></i>
+                    <p class="drop-zone-text">Drag & drop a file to verify, or <strong>browse</strong></p>
+                    <input type="file" name="file" class="file-input" required>
+                </div>
+
+                <div class="selected-file">
+                    <i class="fa-solid fa-file-lines" style="color: var(--success)"></i>
+                    <span class="file-name">No file selected</span>
+                </div>
+
+                <button type="submit" class="btn btn-secondary" style="margin-top: 1.5rem;">
+                    <i class="fa-solid fa-magnifying-glass-chart"></i> Run Verification
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Details Section -->
+    <div class="info-section">
+        <h2 class="info-title">Why EpochSeal?</h2>
+        <div class="features-grid">
+            <div class="feature-card">
+                <i class="fa-solid fa-lock feature-icon"></i>
+                <h3>Cryptographic Security</h3>
+                <p>Documents are secured via advanced ECDSA signatures and SHA-256 hashes, immediately detecting any unauthorized tampering.</p>
+            </div>
+            <div class="feature-card">
+                <i class="fa-solid fa-hourglass-start feature-icon"></i>
+                <h3>Time-Bound Trust</h3>
+                <p>Unlike infinite signatures, EpochSeal enforces strict authenticity windows. Outdated files are automatically invalidated to thwart replay attacks.</p>
+            </div>
+            <div class="feature-card">
+                <i class="fa-solid fa-scale-balanced feature-icon"></i>
+                <h3>Zero-Trust Architecture</h3>
+                <p>Designed for systems where trust is temporary. We guarantee explicit re-verification so only active documents remain valid.</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
+
+
+--- File: ./templates/dashboard.html ---
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EpochSeal | Verification Result</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+
+    <h1 class="title">Analysis Complete</h1>
+    <p class="subtitle">Trust Engine Verification Report</p>
+
+    <div class="dashboard-container">
+        <div class="clean-panel">
+            <!-- Status Indicator -->
+            <div class="status-indicator status-{{ status }}">
+                {% if status == 'VALID' or status == 'SIGNED' %}
+                    <i class="fa-solid fa-check"></i>
+                {% elif status == 'EXPIRED' %}
+                    <i class="fa-solid fa-clock-rotate-left"></i>
+                {% else %}
+                    <i class="fa-solid fa-xmark"></i>
+                {% endif %}
+            </div>
+
+            <h2 style="font-size: 2rem; margin-bottom: 2rem; letter-spacing: 2px;">{{ status }}</h2>
+
+            <!-- Stats -->
+            <div class="result-stat">
+                <span class="stat-label">Trust Score</span>
+                <span class="stat-value">{{ score }}%</span>
+            </div>
+
+            <div class="result-stat">
+                <span class="stat-label">Expiry Timestamp</span>
+                <span class="stat-value" style="font-size: 1.2rem; color: var(--text-main);">{{ expiry }}</span>
+            </div>
+
+            <a href="/" class="action-link">
+                <i class="fa-solid fa-arrow-left"></i> Analyze Another File
+            </a>
+        </div>
+    </div>
+
+</body>
+</html>
+
+
+--- File: ./templates/files.html ---
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EpochSeal | Signature Registry</title>
+    <!-- Use FontAwesome for simple icons, or just SVGs. We'll use CDN for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <style>
+        .registry-container {
+            width: 100%;
+            max-width: 1000px;
+            margin-top: 2rem;
+        }
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+        .data-table th, .data-table td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .data-table th {
+            color: var(--text-muted);
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            letter-spacing: 0.05em;
+        }
+        .data-table tr:hover {
+            background: rgba(255, 255, 255, 0.02);
+        }
+        .badge {
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .action-btn {
+            padding: 0.5rem 1rem;
+            font-size: 0.85rem;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-muted);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="logo-container">
+        <i class="fa-solid fa-database logo-icon"></i>
+        <h1 class="title">Signature <span class="logo-accent">Registry</span></h1>
+    </div>
+    <p class="subtitle">System Record of all Encrypted Signatures</p>
+
+    <div class="registry-container clean-panel">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h2 class="panel-title" style="margin: 0;"><i class="fa-solid fa-list"></i> Activity Log</h2>
+            <a href="/" class="btn btn-secondary" style="width: auto; padding: 0.5rem 1rem;">
+                <i class="fa-solid fa-home"></i> Back Home
+            </a>
+        </div>
+        
+        {% if files %}
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Filename</th>
+                    <th>Created At</th>
+                    <th>Expiry</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for file in files %}
+                <tr>
+                    <td style="font-weight: 500; color: var(--text-main);">{{ file.filename }}</td>
+                    <td style="color: var(--text-muted); font-size: 0.9rem;">{{ file.created_at[:16].replace('T', ' ') }}</td>
+                    <td style="color: var(--text-muted); font-size: 0.9rem;">{{ file.expiry[:16].replace('T', ' ') }}</td>
+                    <td>
+                        <a href="/verify_record/{{ file.id }}" class="btn btn-primary action-btn" style="width: 120px; display: inline-flex;">
+                            Test File <i class="fa-solid fa-chevron-right"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">
+            <i class="fa-solid fa-folder-open" style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.5;"></i>
+            <p>No signatures found in the database yet.</p>
+        </div>
+        {% endif %}
+    </div>
+
+</body>
+</html>
+
+
+--- File: ./static/style.css ---
+
+
+
+--- File: ./static/script.js ---
+
+
+
+--- File: ./static/css/styles.css ---
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+
+:root {
+  --bg-color: #0f172a;
+  --card-bg: #1e293b;
+  --text-main: #f8fafc;
+  --text-muted: #94a3b8;
+  --primary: #3b82f6;
+  --primary-hover: #60a5fa;
+  --success: #10b981;
+  --danger: #ef4444;
+  --border-color: #334155;
+  --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.3), 0 2px 4px -2px rgb(0 0 0 / 0.3);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: var(--bg-color);
+  color: var(--text-main);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 4rem 2rem;
+}
+
+h1, h2, h3 {
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+/* Typography elements */
+.logo-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.logo-icon {
+  font-size: 2.5rem;
+  color: var(--primary);
+}
+
+.title {
+  font-size: 2.5rem;
+  font-weight: 700;
+  letter-spacing: -0.05em;
+  margin-bottom: 0;
+}
+
+.logo-accent {
+  font-weight: 400;
+  color: var(--primary);
+}
+
+.subtitle {
+  color: var(--text-muted);
+  text-align: center;
+  margin-bottom: 3rem;
+  font-size: 1.1rem;
+}
+
+/* Layout */
+.container {
+  width: 100%;
+  max-width: 900px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  margin-bottom: 4rem;
+}
+
+@media (max-width: 768px) {
+  .container {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Clean Panels */
+.clean-panel {
+  background: var(--card-bg);
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  box-shadow: var(--shadow);
+  padding: 2rem;
+}
+
+.panel-title {
+  font-size: 1.25rem;
+  margin-bottom: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-main);
+}
+
+/* Forms and Inputs */
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+.form-label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+  color: var(--text-main);
+  font-weight: 500;
+}
+
+.form-input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: var(--bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-main);
+  font-family: inherit;
+  font-size: 1rem;
+  transition: border-color 0.15s ease;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+/* Drag and Drop Zone */
+.drop-zone {
+  border: 2px dashed var(--border-color);
+  border-radius: 8px;
+  padding: 2rem;
+  text-align: center;
+  transition: all 0.15s ease;
+  cursor: pointer;
+  background: rgba(15, 23, 42, 0.5);
+  position: relative;
+  margin-bottom: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.drop-zone:hover, .drop-zone.dragover {
+  background: var(--border-color);
+  border-color: var(--text-muted);
+}
+
+.drop-zone-icon {
+  font-size: 2rem;
+  color: var(--text-muted);
+}
+
+.drop-zone-text {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+
+.file-input {
+  position: absolute;
+  top: 0; left: 0; width: 100%; height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.selected-file {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  background: var(--bg-color);
+  border-radius: 6px;
+  display: none;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+}
+
+/* Buttons */
+.btn {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: none;
+  border-radius: 6px;
+  font-family: inherit;
+  font-weight: 500;
+  font-size: 1rem;
+  cursor: pointer;
+  color: #fff;
+  transition: background-color 0.15s ease;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btn-primary {
+  background: var(--primary);
+}
+
+.btn-primary:hover {
+  background: var(--primary-hover);
+}
+
+.btn-secondary {
+  background: #334155;
+}
+
+.btn-secondary:hover {
+  background: #475569;
+}
+
+/* Info Section */
+.info-section {
+  width: 100%;
+  max-width: 900px;
+  margin-top: 2rem;
+  text-align: center;
+}
+
+.info-title {
+  font-size: 1.5rem;
+  margin-bottom: 2rem;
+  color: var(--text-main);
+}
+
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
+}
+
+@media (max-width: 768px) {
+  .features-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.feature-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 1.5rem;
+  text-align: left;
+}
+
+.feature-icon {
+  font-size: 1.5rem;
+  color: var(--primary);
+  margin-bottom: 1rem;
+}
+
+.feature-card h3 {
+  font-size: 1.1rem;
+  margin-bottom: 0.75rem;
+}
+
+.feature-card p {
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+/* Dashboard Results */
+.dashboard-container {
+  max-width: 600px;
+  width: 100%;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.status-indicator {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  margin: 0 auto 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.5rem;
+}
+
+.status-VALID, .status-SIGNED {
+  background: rgba(16, 185, 129, 0.2);
+  color: var(--success);
+}
+
+.status-TAMPERED, .status-EXPIRED {
+  background: rgba(239, 68, 68, 0.2);
+  color: var(--danger);
+}
+
+.result-stat {
+  background: rgba(15, 23, 42, 0.5);
+  border-radius: 8px;
+  padding: 1.25rem;
+  margin-bottom: 1rem;
+  border: 1px solid var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.stat-label {
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.stat-value {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.action-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--primary);
+  text-decoration: none;
+  margin-top: 2rem;
+  font-weight: 500;
+}
+
+.action-link:hover {
+  text-decoration: underline;
+}
+
+
+--- File: ./static/js/main.js ---
+document.addEventListener('DOMContentLoaded', () => {
+    // Setup Drop Zones
+    const dropZones = document.querySelectorAll('.drop-zone');
+
+    dropZones.forEach(zone => {
+        const fileInput = zone.querySelector('.file-input');
+        const selectedFileDiv = zone.parentNode.querySelector('.selected-file');
+        const fileNameSpan = selectedFileDiv ? selectedFileDiv.querySelector('.file-name') : null;
+
+        // Prevent default drag behaviors
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            zone.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        // Highlight drop zone when item is dragged over it
+        ['dragenter', 'dragover'].forEach(eventName => {
+            zone.addEventListener(eventName, highlight, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            zone.addEventListener(eventName, unhighlight, false);
+        });
+
+        function highlight(e) {
+            zone.classList.add('dragover');
+        }
+
+        function unhighlight(e) {
+            zone.classList.remove('dragover');
+        }
+
+        // Handle dropped files
+        zone.addEventListener('drop', handleDrop, false);
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            
+            if (files.length) {
+                fileInput.files = files; // Assign files to input
+                updateFileList(files[0]);
+            }
+        }
+
+        // Handle selected files via click
+        fileInput.addEventListener('change', function() {
+            if (this.files.length) {
+                updateFileList(this.files[0]);
+            }
+        });
+
+        function updateFileList(file) {
+            if (selectedFileDiv && fileNameSpan) {
+                fileNameSpan.textContent = file.name;
+                selectedFileDiv.style.display = 'flex';
+                
+                // Add a small bounce animation to the file name
+                selectedFileDiv.style.animation = 'pulse 0.5s ease';
+                setTimeout(() => {
+                    selectedFileDiv.style.animation = '';
+                }, 500);
+            }
+        }
+    });
+});
+
+
+--- File: ./core/crypto.py ---
+import hashlib
+import json
+import datetime
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.exceptions import InvalidSignature
+
+
+def sign_content(file_path, expiry_seconds):
+    with open(file_path, "rb") as f:
+        content = f.read()
+
+    content_hash = hashlib.sha256(content).hexdigest()
+
+    expiry_time = (datetime.datetime.utcnow() +
+                   datetime.timedelta(seconds=expiry_seconds)).isoformat()
+
+    metadata = {
+        "file": file_path,
+        "hash": content_hash,
+        "expiry": expiry_time
+    }
+
+    with open("keys/private_key.pem", "rb") as f:
+        private_key = serialization.load_pem_private_key(f.read(), password=None)
+
+    signature = private_key.sign(
+        json.dumps(metadata).encode(),
+        ec.ECDSA(hashes.SHA256())
+    )
+
+    output = {
+        "metadata": metadata,
+        "signature": signature.hex()
+    }
+
+    return output
+
+
+def verify_content(file_path, metadata, signature_hex):
+    signature = bytes.fromhex(signature_hex)
+
+    with open("keys/public_key.pem", "rb") as f:
+        public_key = serialization.load_pem_public_key(f.read())
+
+    # Expiry check
+    expiry_time = datetime.datetime.fromisoformat(metadata["expiry"])
+    expired = datetime.datetime.utcnow() > expiry_time
+
+    # Hash check
+    with open(file_path, "rb") as f:
+        content = f.read()
+
+    current_hash = hashlib.sha256(content).hexdigest()
+    tampered = current_hash != metadata["hash"]
+
+    # Signature check
+    try:
+        public_key.verify(
+            signature,
+            json.dumps(metadata).encode(),
+            ec.ECDSA(hashes.SHA256())
+        )
+        signature_valid = True
+    except InvalidSignature:
+        signature_valid = False
+
+    return {
+        "expired": expired,
+        "tampered": tampered,
+        "signature_valid": signature_valid,
+        "expiry": metadata["expiry"]
+    }
+
+
+--- File: ./core/trust_engine.py ---
+import datetime
+
+def calculate_trust(result):
+    if result["tampered"]:
+        return 0, "TAMPERED"
+
+    if not result["signature_valid"]:
+        return 10, "INVALID SIGNATURE"
+
+    expiry_time = datetime.datetime.fromisoformat(result["expiry"])
+    remaining = (expiry_time - datetime.datetime.utcnow()).total_seconds()
+
+    if result["expired"]:
+        return 20, "EXPIRED"
+
+    if remaining < 30:
+        return 60, "NEAR EXPIRY"
+
+    return 90, "VALID"
+
+
+--- File: ./database/db.py ---
+import sqlite3
+import datetime
+import os
+
+DB_PATH = os.path.join(os.path.dirname(__file__), 'app.db')
+
+def get_db_connection():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+def init_db():
+    conn = get_db_connection()
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS files (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            filename TEXT NOT NULL,
+            file_hash TEXT NOT NULL,
+            expiry TEXT NOT NULL,
+            signature_hex TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+def insert_file(filename, file_hash, expiry, signature_hex):
+    conn = get_db_connection()
+    created_at = datetime.datetime.utcnow().isoformat()
+    conn.execute('''
+        INSERT INTO files (filename, file_hash, expiry, signature_hex, created_at)
+        VALUES (?, ?, ?, ?, ?)
+    ''', (filename, file_hash, expiry, signature_hex, created_at))
+    conn.commit()
+    conn.close()
+
+def get_all_files():
+    conn = get_db_connection()
+    files = conn.execute('SELECT * FROM files ORDER BY id DESC').fetchall()
+    conn.close()
+    return [dict(ix) for ix in files]
+
+def get_file_by_id(file_id):
+    conn = get_db_connection()
+    file_record = conn.execute('SELECT * FROM files WHERE id = ?', (file_id,)).fetchone()
+    conn.close()
+    if file_record:
+        return dict(file_record)
+    return None
+
+def get_file_by_name(filename):
+    conn = get_db_connection()
+    # It's possible there are multiple uploads with the same name, we return the most recent
+    file_record = conn.execute('SELECT * FROM files WHERE filename = ? ORDER BY id DESC', (filename,)).fetchone()
+    conn.close()
+    if file_record:
+        return dict(file_record)
+    return None
+
+
