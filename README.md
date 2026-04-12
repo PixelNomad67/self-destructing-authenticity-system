@@ -88,9 +88,4 @@ Then, open your browser and navigate to `http://127.0.0.1:5000`.
 - [ ] Distributed key decay simulation
 - [ ] Decentralized verification networks
 
----
 
-## 👨‍💻 Author
-**Piyush Roy**  
-Registration No.: `2427030318`  
-Section: `C`
