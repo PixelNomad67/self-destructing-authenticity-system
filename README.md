@@ -4,7 +4,7 @@
 
 **Demo link:** [https://p-yuxh-self-destructing-authenticity-system.hf.space](https://p-yuxh-self-destructing-authenticity-system.hf.space)
 
-**Time-Bound Digital Authenticity System** is a groundbreaking framework that introduces expiration dates to digital authenticity. Unlike traditional digital signatures that remain valid indefinitely (potentially leading to replay attacks or out-of-context misuse), this system ensures that signed content is only considered authentic within a predefined, strict time window. Once the time is up, the content safely "self-destructs" its trusted status.
+**Time-Bound Digital Authenticity System** introduces expiration dates to digital authenticity. Unlike traditional digital signatures that remain valid indefinitely (potentially leading to replay attacks or out-of-context misuse), this system ensures that signed content is only considered authentic within a predefined, strict time window. Once the time is up, the content safely "self-destructs" its trusted status.
 
 ---
 
