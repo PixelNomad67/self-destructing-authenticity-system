@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EpochSeal | Verification Result</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+
+    <h1 class="title">Analysis Complete</h1>
+    <p class="subtitle">Trust Engine Verification Report</p>
+
+    <div class="dashboard-container">
+        <div class="clean-panel">
+            <!-- Status Indicator -->
+            <div class="status-indicator status-{{ status }}">
+                {% if status == 'VALID' or status == 'SIGNED' %}
+                    <i class="fa-solid fa-check"></i>
+                {% elif status == 'EXPIRED' %}
+                    <i class="fa-solid fa-clock-rotate-left"></i>
+                {% else %}
+                    <i class="fa-solid fa-xmark"></i>
+                {% endif %}
+            </div>
+
+            <h2 style="font-size: 2rem; margin-bottom: 2rem; letter-spacing: 2px;">{{ status }}</h2>
+
+            <!-- Stats -->
+            <div class="result-stat">
+                <span class="stat-label">Trust Score</span>
+                <span class="stat-value">{{ score }}%</span>
+            </div>
+
+            <div class="result-stat">
+                <span class="stat-label">Expiry Timestamp</span>
+                <span class="stat-value" style="font-size: 1.2rem; color: var(--text-main);">{{ expiry }}</span>
+            </div>
+
+            <a href="/" class="action-link">
+                <i class="fa-solid fa-arrow-left"></i> Analyze Another File
+            </a>
+        </div>
+    </div>
+
+</body>
+</html>

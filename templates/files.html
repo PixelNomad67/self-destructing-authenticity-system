@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EpochSeal | Signature Registry</title>
+    <!-- Use FontAwesome for simple icons, or just SVGs. We'll use CDN for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <style>
+        .registry-container {
+            width: 100%;
+            max-width: 1000px;
+            margin-top: 2rem;
+        }
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+        .data-table th, .data-table td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .data-table th {
+            color: var(--text-muted);
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            letter-spacing: 0.05em;
+        }
+        .data-table tr:hover {
+            background: rgba(255, 255, 255, 0.02);
+        }
+        .badge {
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .action-btn {
+            padding: 0.5rem 1rem;
+            font-size: 0.85rem;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-muted);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="logo-container">
+        <i class="fa-solid fa-database logo-icon"></i>
+        <h1 class="title">Signature <span class="logo-accent">Registry</span></h1>
+    </div>
+    <p class="subtitle">System Record of all Encrypted Signatures</p>
+
+    <div class="registry-container clean-panel">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h2 class="panel-title" style="margin: 0;"><i class="fa-solid fa-list"></i> Activity Log</h2>
+            <a href="/" class="btn btn-secondary" style="width: auto; padding: 0.5rem 1rem;">
+                <i class="fa-solid fa-home"></i> Back Home
+            </a>
+        </div>
+        
+        {% if files %}
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Filename</th>
+                    <th>Created At</th>
+                    <th>Expiry</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for file in files %}
+                <tr>
+                    <td style="font-weight: 500; color: var(--text-main);">{{ file.filename }}</td>
+                    <td style="color: var(--text-muted); font-size: 0.9rem;">{{ file.created_at[:16].replace('T', ' ') }}</td>
+                    <td style="color: var(--text-muted); font-size: 0.9rem;">{{ file.expiry[:16].replace('T', ' ') }}</td>
+                    <td>
+                        <a href="/verify_record/{{ file.id }}" class="btn btn-primary action-btn" style="width: 120px; display: inline-flex;">
+                            Test File <i class="fa-solid fa-chevron-right"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty-state">
+            <i class="fa-solid fa-folder-open" style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.5;"></i>
+            <p>No signatures found in the database yet.</p>
+        </div>
+        {% endif %}
+    </div>
+
+</body>
+</html>

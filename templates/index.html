@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EpochSeal | Authenticity Engine</title>
+    <!-- Use FontAwesome for simple icons, or just SVGs. We'll use CDN for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+
+    <div class="logo-container">
+        <i class="fa-solid fa-fingerprint logo-icon"></i>
+        <h1 class="title">Epoch<span class="logo-accent">Seal</span></h1>
+    </div>
+    <p class="subtitle">Time-Bound Digital Authenticity System</p>
+
+    <!-- Navigation -->
+    <div style="margin-bottom: 2rem;">
+        <a href="/registry" class="btn btn-secondary" style="display: inline-flex; width: auto; padding: 0.75rem 1.5rem;">
+            <i class="fa-solid fa-database"></i> View Signature Database
+        </a>
+    </div>
+
+    <div class="container">
+        <!-- Sign Panel -->
+        <div class="clean-panel">
+            <h2 class="panel-title"><i class="fa-solid fa-file-signature"></i> Sign Content</h2>
+            <form action="/sign" method="post" enctype="multipart/form-data">
+                
+                <div class="drop-zone">
+                    <i class="fa-solid fa-cloud-arrow-up drop-zone-icon"></i>
+                    <p class="drop-zone-text">Drag & drop a file to sign, or <strong>browse</strong></p>
+                    <input type="file" name="file" class="file-input" required>
+                </div>
+                
+                <div class="selected-file">
+                    <i class="fa-solid fa-file-lines" style="color: var(--primary-cyan)"></i>
+                    <span class="file-name">No file selected</span>
+                </div>
+
+                <div class="form-group" style="margin-top: 1.5rem;">
+                    <label class="form-label" for="expiry">Expiry Time (Seconds)</label>
+                    <input type="number" id="expiry" name="expiry" class="form-input" placeholder="e.g., 3600" required min="1">
+                </div>
+
+                <button type="submit" class="btn btn-primary">
+                    <i class="fa-solid fa-lock"></i> Generate Signature
+                </button>
+            </form>
+        </div>
+
+        <!-- Verify Panel -->
+        <div class="clean-panel">
+            <h2 class="panel-title"><i class="fa-solid fa-shield-halved"></i> Verify Authenticity</h2>
+            <form action="/verify" method="post" enctype="multipart/form-data">
+                
+                <div class="drop-zone" style="height: calc(100% - 94px); min-height: 200px;">
+                    <i class="fa-solid fa-file-circle-check drop-zone-icon"></i>
+                    <p class="drop-zone-text">Drag & drop a file to verify, or <strong>browse</strong></p>
+                    <input type="file" name="file" class="file-input" required>
+                </div>
+
+                <div class="selected-file">
+                    <i class="fa-solid fa-file-lines" style="color: var(--success)"></i>
+                    <span class="file-name">No file selected</span>
+                </div>
+
+                <button type="submit" class="btn btn-secondary" style="margin-top: 1.5rem;">
+                    <i class="fa-solid fa-magnifying-glass-chart"></i> Run Verification
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Details Section -->
+    <div class="info-section">
+        <h2 class="info-title">Why EpochSeal?</h2>
+        <div class="features-grid">
+            <div class="feature-card">
+                <i class="fa-solid fa-lock feature-icon"></i>
+                <h3>Cryptographic Security</h3>
+                <p>Documents are secured via advanced ECDSA signatures and SHA-256 hashes, immediately detecting any unauthorized tampering.</p>
+            </div>
+            <div class="feature-card">
+                <i class="fa-solid fa-hourglass-start feature-icon"></i>
+                <h3>Time-Bound Trust</h3>
+                <p>Unlike infinite signatures, EpochSeal enforces strict authenticity windows. Outdated files are automatically invalidated to thwart replay attacks.</p>
+            </div>
+            <div class="feature-card">
+                <i class="fa-solid fa-scale-balanced feature-icon"></i>
+                <h3>Zero-Trust Architecture</h3>
+                <p>Designed for systems where trust is temporary. We guarantee explicit re-verification so only active documents remain valid.</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
