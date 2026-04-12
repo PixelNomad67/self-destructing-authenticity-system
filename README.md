@@ -1,12 +1,4 @@
----
-title: Time-Bound Digital Authenticity System
-emoji: 🛡️
-colorFrom: indigo
-colorTo: blue
-sdk: docker
-pinned: false
-app_port: 7860
----
+
 
 # 🛡️ Time-Bound Digital Authenticity System
 
